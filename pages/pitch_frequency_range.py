@@ -2,7 +2,6 @@ import streamlit as st
 
 from utils.audio_tools import single_tone_wav
 from utils.test_config import load_test_config
-
 from utils.ui import (
     render_instructions,
     render_page_header,
