@@ -67,7 +67,7 @@ def student_build_amplitude_intervals_audio(
     reference_hz: int,
     target_index: int,
 ) -> list[bytes]:
-    """TODO: Build one 3AFC trial audio set for amplitude discrimination.
+    """Build one 3AFC trial audio set for amplitude discrimination.
 
     Why this function exists:
         Each trial needs exactly three candidate sounds with one target interval.
@@ -90,7 +90,17 @@ def student_build_amplitude_intervals_audio(
         - Use louder amplitude for `target_index`.
         - Return WAV bytes compatible with `st.audio`.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    audio_clips = []
+    for idx in range(3):
+        freq = reference_hz
+        amplitude = baseline_amplitude * (10 ** (delta_db / 20.0)) if idx == target_index else baseline_amplitude
+        clip = single_tone_wav(
+            frequency_hz=freq,
+            duration_s=float(cfg["tone_duration_s"]),
+            amplitude=amplitude,
+        )
+        audio_clips.append(clip)
+    return audio_clips
 
 
 def student_apply_reversal_update(

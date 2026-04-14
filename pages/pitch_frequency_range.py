@@ -51,44 +51,96 @@ def student_estimate_audible_bounds(
     probe_history_hz: list[int],
     heard_flags: list[bool],
 ) -> tuple[int, int]:
-    """TODO: summarize heard probe frequencies into lower/upper bounds.
+    """Summarize heard probe frequencies into lower/upper bounds.
 
     Pair the frequencies marked as heard and return the min/max. If no probes
     were heard, return a sensible fallback such as the configured default.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    crazy_high = 1000000000000000
+    heard_max = 0
+    heard_min = crazy_high
+    for i in range(len(probe_history_hz)):
+        if heard_flags[i]:
+            heard_min = min(heard_min, probe_history_hz[i])
+            heard_max = max(heard_max, probe_history_hz[i])
+    if heard_max == 0:
+        heard_max = default_frequency
+    if heard_min == crazy_high:
+        heard_min = default_frequency
+    return heard_min, heard_max
 
 
 def student_validate_audio_params(*, frequency_hz: int, amplitude: float) -> bool:
-    """TODO: ensure requested playback parameters stay within config limits.
+    """Ensure requested playback parameters stay within config limits.
 
     Return `True` when `frequency_hz` and `amplitude` fall inside the configured
     range, otherwise return `False`.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    freq_min = int(cfg["frequency_hz"]["min"])
+    freq_max = int(cfg["frequency_hz"]["max"])
+    if frequency_hz < freq_min or frequency_hz > freq_max:
+        return False
+    amp_min = float(cfg["playback_amplitude"]["min"])
+    amp_max = float(cfg["playback_amplitude"]["max"])
+    if amplitude < amp_min or amplitude > amp_max:
+        return False
+    return True
 
 
-with st.expander("Assignment TODOs (Edit This Page)"):
-    st.markdown(
-        "- Implement `student_estimate_audible_bounds` using example probe results.\n"
-        "- Implement `student_validate_audio_params` to gate playback inputs."
-    )
+# with st.expander("Assignment TODOs (Edit This Page)"):
+#     st.markdown(
+#         "- Implement `student_estimate_audible_bounds` using example probe results.\n"
+#         "- Implement `student_validate_audio_params` to gate playback inputs."
+#     )
 
-st.caption(
-    "Optional TODO: once the helper functions exist you could show estimated bounds "
-    "and validate that playback parameters stay within config limits."
-)
+# st.caption(
+#     "Optional TODO: once the helper functions exist you could show estimated bounds "
+#     "and validate that playback parameters stay within config limits."
+# )
 
 with st.container(border=True):
     st.subheader("Tone Playback")
+    
+    import math
+    
+    # Initialize synced frequency value in session_state
+    if "frequency_hz_synced" not in st.session_state:
+        st.session_state.frequency_hz_synced = default_frequency
+    
+    # Log slider - convert between log and linear scales
+    min_hz = int(cfg["frequency_hz"]["min"])
+    max_hz = int(cfg["frequency_hz"]["max"])
+    log_min = math.log(min_hz)
+    log_max = math.log(max_hz)
+    log_current = math.log(st.session_state.frequency_hz_synced)
+    
+    log_slider_value = st.slider(
+        f"Test frequency (Hz) - log scale ({min_hz}-{max_hz} Hz)",
+        min_value=log_min,
+        max_value=log_max,
+        value=log_current,
+        key="pitch_playback_slider",
+        on_change=lambda: st.session_state.update(
+            {"frequency_hz_synced": int(math.exp(st.session_state.pitch_playback_slider))}
+        ),
+    )
+    st.caption(f"Current frequency: {int(st.session_state.frequency_hz_synced)} Hz")
+    
+    # Number input - updates synced value on change
     frequency_hz = st.number_input(
         "Exact test frequency (Hz)",
         min_value=int(cfg["frequency_hz"]["min"]),
         max_value=int(cfg["frequency_hz"]["max"]),
-        value=default_frequency,
+        value=st.session_state.frequency_hz_synced,
         step=int(cfg["frequency_hz"]["step"]),
         key="pitch_playback_input",
+        on_change=lambda: st.session_state.update(
+            {"frequency_hz_synced": st.session_state.pitch_playback_input}
+        ),
     )
+    
+    # Use the synced value
+    frequency_hz = st.session_state.frequency_hz_synced
     amplitude = st.slider(
         "Playback amplitude",
         min_value=float(cfg["playback_amplitude"]["min"]),
@@ -97,4 +149,4 @@ with st.container(border=True):
         step=float(cfg["playback_amplitude"]["step"]),
     )
     st.audio(single_tone_wav(frequency_hz=frequency_hz, amplitude=amplitude), format="audio/wav")
-    st.caption(f"Current test tone: {format_frequency_hz(int(frequency_hz))}")
+    st.caption(f"Current test tone: {int(frequency_hz)} Hz")

@@ -86,7 +86,16 @@ def student_build_pitch_intervals_audio(
         - One clip at `reference_hz + delta_hz`.
         - Keep duration and amplitude consistent across intervals.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    audio_clips = []
+    for idx in range(3):
+        freq = reference_hz + delta_hz if idx == target_index else reference_hz
+        clip = single_tone_wav(
+            frequency_hz=freq,
+            duration_s=float(cfg["tone_duration_s"]),
+            amplitude=amplitude,
+        )
+        audio_clips.append(clip)
+    return audio_clips
 
 
 def student_apply_reversal_update(

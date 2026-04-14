@@ -65,7 +65,7 @@ def student_build_gap_intervals_audio(
     target_index: int,
     seed: int,
 ) -> list[bytes]:
-    """TODO: Build one 3AFC trial audio set for gap detection.
+    """Build one 3AFC trial audio set for gap detection.
 
     Why this function exists:
         The listener must compare three intervals where only one contains the silent
@@ -86,7 +86,17 @@ def student_build_gap_intervals_audio(
         - Keep amplitude consistent across all three clips.
         - Use deterministic seeds so repeated runs are reproducible.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    audio_clips = []
+    for idx in range(3):
+        interval_gap_ms = gap_ms if idx == target_index else 0.0
+        wav_bytes = noise_burst_with_gap_wav(
+            duration_s=float(cfg["playback"]["burst_duration_s"]),
+            gap_ms=interval_gap_ms,
+            amplitude=amplitude,
+            seed=seed + idx,
+        )
+        audio_clips.append(wav_bytes)
+    return audio_clips
 
 
 def student_apply_reversal_update(
@@ -181,24 +191,24 @@ def student_plot_staircase_with_threshold(
     )
 
 
-with st.expander("Assignment TODOs (Edit This Page)"):
-    st.markdown(
-        "- Implement `student_build_gap_intervals_audio`.\n"
-        "- Implement shared 3AFC helpers in `pages/_shared_3afc_student.py`:\n"
-        "  - `shared_student_apply_reversal_update`\n"
-        "  - `shared_student_plot_staircase`\n"
-        "  - `shared_student_build_three_interval_targets`\n"
-        "  - `shared_student_update_staircase_state`\n"
-        "  - `shared_student_estimate_threshold_from_reversals`\n"
-        "  - `shared_student_compute_recent_accuracy`\n"
-        "  - `shared_student_validate_audio_params`\n"
-        "  - `shared_student_plot_staircase_with_threshold`"
-    )
+# with st.expander("Assignment TODOs (Edit This Page)"):
+#     st.markdown(
+#         "- Implement `student_build_gap_intervals_audio`.\n"
+#         "- Implement shared 3AFC helpers in `pages/_shared_3afc_student.py`:\n"
+#         "  - `shared_student_apply_reversal_update`\n"
+#         "  - `shared_student_plot_staircase`\n"
+#         "  - `shared_student_build_three_interval_targets`\n"
+#         "  - `shared_student_update_staircase_state`\n"
+#         "  - `shared_student_estimate_threshold_from_reversals`\n"
+#         "  - `shared_student_compute_recent_accuracy`\n"
+#         "  - `shared_student_validate_audio_params`\n"
+#         "  - `shared_student_plot_staircase_with_threshold`"
+#     )
 
-st.caption(
-    "How these functions connect: generate three noise intervals (one with gap) -> "
-    "update adaptive staircase from responses -> estimate threshold from reversals -> plot."
-)
+# st.caption(
+#     "How these functions connect: generate three noise intervals (one with gap) -> "
+#     "update adaptive staircase from responses -> estimate threshold from reversals -> plot."
+# )
 
 try:
     _ = student_build_three_interval_targets(target_index=1)

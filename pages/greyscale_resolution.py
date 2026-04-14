@@ -46,7 +46,7 @@ def student_build_preview_triplets(
     rows: int,
     seed: int,
 ) -> list[str]:
-    """TODO: generate a deterministic preview chart.
+    """Generate a deterministic preview chart.
 
     Return exactly `rows` strings, each three letters long, sampled from
     `letters_pool` using a RNG initialized with `seed`. This helper keeps the
@@ -54,16 +54,21 @@ def student_build_preview_triplets(
 
     If `rows <= 0` or `letters_pool` is empty, return an empty list.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    random.seed(seed)
+    if rows <= 0 or not letters_pool: # check for illegal cases
+        return []
+    return ["".join(random.choices(letters_pool, k=3)) for _ in range(rows)]
 
 
 def student_compute_contrast_levels(*, rows: int, step_log10: float) -> list[float]:
-    """TODO: return a log-spaced contrast schedule in percent.
+    """Return a log-spaced contrast schedule in percent.
 
     Use `contrast_percent = 100 * 10 ** (-(row_index * step_log10))` for
     row_index 0..rows‑1. If `rows <= 0`, return an empty list.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    if rows <= 0:
+        return []
+    return [100 * 10 ** (-(row_index * step_log10)) for row_index in range(rows)]
 
 
 def student_advance_contrast_state(
@@ -72,36 +77,40 @@ def student_advance_contrast_state(
     response_yes: bool,
     total_levels: int,
 ) -> tuple[int, bool]:
-    """TODO: advance the trial index or finish the run.
+    """Advance the trial index or finish the run.
 
     Return `(next_index, finished)`. Finish if `response_yes` is False or when
     advancing goes beyond `total_levels - 1`. Clamp `next_index` to valid range.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    if trial_index < 0 or total_levels <= 0:
+        raise ValueError("Invalid trial index or total levels.")
+    if trial_index+1 >= total_levels:
+        return total_levels, True
+    if not response_yes:
+        return trial_index+1, True
+    return trial_index + 1, False
 
 
 def student_compute_log_contrast_sensitivity(threshold_percent: float) -> float:
-    """TODO: convert percent threshold to log contrast sensitivity.
+    """Convert percent threshold to log contrast sensitivity.
 
     Use `log10(1 / (threshold_percent / 100))` and guard against zero or
     negative thresholds to avoid math errors.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    if threshold_percent <= 0:
+        return 0.0
+    return math.log10(1 / (threshold_percent / 100))
 
 
-with st.expander("Assignment TODOs (Edit This Page)"):
-    st.markdown(
-        "- Implement `student_build_preview_triplets`.\n"
-        "- Implement `student_compute_contrast_levels`.\n"
-        "- Implement `student_advance_contrast_state`.\n"
-        "- Implement `student_compute_log_contrast_sensitivity`.\n"
-        "- Keep function signatures unchanged."
-    )
+# with st.expander("Assignment TODOs (Edit This Page)"):
+#     st.markdown(
+#         "- Keep function signatures unchanged."
+#     )
 
-st.caption(
-    "How these functions connect: generate deterministic preview rows -> compute contrast schedule "
-    "-> advance trial state based on responses -> compute final log contrast sensitivity."
-)
+# st.caption(
+#     "How functions connect: generate deterministic preview rows -> compute contrast schedule "
+#     "-> advance trial state based on responses -> compute final log contrast sensitivity."
+# )
 
 try:
     contrast_levels_pct = student_compute_contrast_levels(rows=row_count, step_log10=log_step)
@@ -110,6 +119,9 @@ try:
         rows=row_count,
         seed=int(cfg["preview"]["seed"]),
     )
+    # Create separate RNG for trial letters
+    if "greyscale_pelli_trial_rng" not in st.session_state:
+        st.session_state["greyscale_pelli_trial_rng"] = random.Random(int(cfg["preview"]["seed"]))
     _ = student_advance_contrast_state(trial_index=0, response_yes=True, total_levels=row_count)
 except NotImplementedError as error:
     st.error(str(error))
@@ -137,13 +149,20 @@ def draw_letter_card(letter: str, contrast_pct: float) -> str:
 if "greyscale_pelli_index" not in st.session_state:
     st.session_state["greyscale_pelli_index"] = 0
 if "greyscale_pelli_letter" not in st.session_state:
-    st.session_state["greyscale_pelli_letter"] = random.choice(letters)
+    trial_rng = st.session_state["greyscale_pelli_trial_rng"]
+    st.session_state["greyscale_pelli_letter"] = trial_rng.choice(letters)
 if "greyscale_pelli_history" not in st.session_state:
     st.session_state["greyscale_pelli_history"] = []
 if "greyscale_pelli_finished" not in st.session_state:
     st.session_state["greyscale_pelli_finished"] = False
 if "greyscale_pelli_threshold_pct" not in st.session_state:
     st.session_state["greyscale_pelli_threshold_pct"] = contrast_levels_pct[0]
+if "greyscale_pelli_response" not in st.session_state:
+    st.session_state["greyscale_pelli_response"] = ""
+# Clear input if flag is set (must happen before widget is created)
+if st.session_state.get("greyscale_pelli_clear_response", False):
+    st.session_state["greyscale_pelli_response"] = ""
+    st.session_state["greyscale_pelli_clear_response"] = False
 
 with st.container(border=True):
     st.subheader("Pelli-Style Contrast Chart Preview")
@@ -181,49 +200,57 @@ with st.container(border=True):
 
 with st.container(border=True):
     st.subheader("Respond")
-    response = st.radio(
-        "Can you identify this letter?",
-        ["Yes", "No"],
-        horizontal=True,
-        key="greyscale_pelli_response",
-    )
-    submitted = st.button(
-        "Submit Response",
-        type="primary",
-        width="stretch",
-        disabled=finished,
-    )
+    with st.form("letter_response_form"):
+        user_input = st.text_input(
+            "Type the letter you see (case-insensitive):",
+            key="greyscale_pelli_response",
+            max_chars=1,
+            disabled=finished,
+        ).upper()
+        submitted = st.form_submit_button(
+            "Submit Response",
+            type="primary",
+            use_container_width=True,
+            disabled=finished,
+        )
     if submitted and not finished:
-        # LAB NOTE: This block drives the Pelli-style staircase progression.
-        # Optional extensions can add stricter scoring rules (for example typed-letter checks).
-        can_identify = response == "Yes"
-        st.session_state["greyscale_pelli_history"].append(
-            {
-                "Level": trial_index + 1,
-                "Letter": current_letter,
-                "Contrast (%)": round(current_contrast_pct, 2),
-                "Identified": "Yes" if can_identify else "No",
-            }
-        )
+        if user_input:  # Only process if input is not empty
+            # LAB NOTE: This block drives the Pelli-style staircase progression.
+            # User must type the correct letter to indicate they can identify it.
+            can_identify = user_input == current_letter
+            st.session_state["greyscale_pelli_history"].append(
+                {
+                    "Level": trial_index + 1,
+                    "Letter": current_letter,
+                    "Your Answer": user_input,
+                    "Contrast (%)": round(current_contrast_pct, 2),
+                    "Identified": "Yes" if can_identify else "No",
+                }
+            )
 
-        next_index, next_finished = student_advance_contrast_state(
-            trial_index=trial_index,
-            response_yes=can_identify,
-            total_levels=len(contrast_levels_pct),
-        )
+            next_index, next_finished = student_advance_contrast_state(
+                trial_index=trial_index,
+                response_yes=can_identify,
+                total_levels=len(contrast_levels_pct),
+            )
 
-        if can_identify:
-            st.session_state["greyscale_pelli_threshold_pct"] = current_contrast_pct
+            if can_identify:
+                st.session_state["greyscale_pelli_threshold_pct"] = current_contrast_pct
+            else:
+                if trial_index > 0:
+                    st.session_state["greyscale_pelli_threshold_pct"] = contrast_levels_pct[
+                        trial_index - 1
+                    ]
+            max_index = len(contrast_levels_pct) - 1
+            st.session_state["greyscale_pelli_index"] = min(next_index, max_index)
+            st.session_state["greyscale_pelli_finished"] = bool(next_finished)
+            st.session_state["greyscale_pelli_clear_response"] = True  # Flag to clear on next rerun
+            if not next_finished:
+                trial_rng = st.session_state["greyscale_pelli_trial_rng"]
+                st.session_state["greyscale_pelli_letter"] = trial_rng.choice(letters)
+            st.rerun()
         else:
-            if trial_index > 0:
-                st.session_state["greyscale_pelli_threshold_pct"] = contrast_levels_pct[
-                    trial_index - 1
-                ]
-        st.session_state["greyscale_pelli_index"] = min(next_index, len(contrast_levels_pct) - 1)
-        st.session_state["greyscale_pelli_finished"] = bool(next_finished)
-        if not next_finished:
-            st.session_state["greyscale_pelli_letter"] = random.choice(letters)
-        st.rerun()
+            st.warning("Please enter a letter before submitting.")
 
 threshold_pct = float(st.session_state["greyscale_pelli_threshold_pct"])
 log_cs = student_compute_log_contrast_sensitivity(threshold_pct)

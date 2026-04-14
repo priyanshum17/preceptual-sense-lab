@@ -1,3 +1,4 @@
+import math
 import random
 
 import streamlit as st
@@ -41,7 +42,7 @@ ORIENTATIONS = ["Up", "Down", "Left", "Right"]
 
 
 def student_next_size_index(*, current_index: int, is_correct: bool, max_index: int) -> int:
-    """TODO: Compute the next adaptive size index for the staircase.
+    """Compute the next adaptive size index for the staircase.
 
     Why this function exists:
         This is the core adaptive rule for the visual acuity task. The page calls it
@@ -62,7 +63,12 @@ def student_next_size_index(*, current_index: int, is_correct: bool, max_index: 
         - Incorrect response: move to a larger optotype by decreasing index by 1.
         - Always clamp so index never goes below 0 or above `max_index`.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    if is_correct:
+        next_index = current_index + 1
+    else:
+        next_index = current_index - 1
+    next_index = max(0, min(next_index, max_index))
+    return next_index
 
 
 def student_build_trial_log_row(
@@ -73,7 +79,7 @@ def student_build_trial_log_row(
     correct_orientation: str,
     response: str,
 ) -> dict[str, str | int | float]:
-    """TODO: Build a complete, standardized row for the trial log table.
+    """Build a complete, standardized row for the trial log table.
 
     Why this function exists:
         The experiment needs a clean row per trial for grading and analysis. This
@@ -96,13 +102,21 @@ def student_build_trial_log_row(
         - Include correctness as an explicit readable value.
         - Round MAR to 2 decimals for stable, readable output.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    is_correct = response == correct_orientation
+    return {
+        "Trial": trial_no,
+        "Size (px)": size_px,
+        "MAR (arcmin)": round(mar_arcmin, 2),
+        "Correct Orientation": correct_orientation,
+        "Your Response": response,
+        "Correct": "Yes" if is_correct else "No",
+    }
 
 
 def student_validate_screen_geometry(
     *, distance_cm: float, screen_width_mm: float, screen_width_px: int
 ) -> bool:
-    """TODO: Validate whether screen-geometry inputs are usable.
+    """Validate whether screen-geometry inputs are usable.
 
     Why this function exists:
         MAR calculations rely on physically meaningful geometry values. Invalid
@@ -121,11 +135,20 @@ def student_validate_screen_geometry(
         - Pixel width is large enough to avoid divide-by-zero / tiny denominator.
         - Distance and width remain in realistic human-testing ranges.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    if distance_cm <= 0 or screen_width_mm <= 0 or screen_width_px <= 0:
+        return False
+    if screen_width_px < 10:  # Arbitrary threshold to prevent tiny pixel pitch
+        return False
+    if distance_cm < 10 or distance_cm > 1000:  # 10 cm to 10 m range for typical testing
+        return False
+    # assuming personal monitor and not billboard display
+    if screen_width_mm < 50 or screen_width_mm > 2000:  # 5 cm to 2 m range for typical displays
+        return False  
+    return True
 
 
 def student_compute_mar_arcmin(size_px: int, mm_per_px: float, distance_cm: float) -> float:
-    """TODO: Compute MAR (minimum angle of resolution) in arcminutes.
+    """Compute MAR (minimum angle of resolution) in arcminutes.
 
     Why this function exists:
         Pixel size alone is device-dependent; MAR converts that size into a vision
@@ -145,7 +168,15 @@ def student_compute_mar_arcmin(size_px: int, mm_per_px: float, distance_cm: floa
         - Use a small-angle geometry formula, then convert radians to arcminutes.
         - Return a positive float and guard invalid denominators.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
+    size_mm = size_px * mm_per_px
+    distance_mm = distance_cm * 10
+    if distance_mm <= 0:
+        raise ValueError("Distance must be positive and non-zero.")
+    # approximate using ratio of thickness to distance 
+    # (since distance >> thickness, angle is small)
+    mar_radians = size_mm / distance_mm
+    mar_arcmin = math.degrees(mar_radians) * 60
+    return mar_arcmin
 
 
 def student_format_trial_log_row(
@@ -156,7 +187,7 @@ def student_format_trial_log_row(
     correct_orientation: str,
     response: str,
 ) -> dict[str, str | int | float]:
-    """TODO: Wrapper/formatter for a standardized trial-log row.
+    """Wrapper/formatter for a standardized trial-log row.
 
     Why this function exists:
         In many real codebases, one helper computes values and another helper
@@ -167,23 +198,24 @@ def student_format_trial_log_row(
         This function should return the same schema as `student_build_trial_log_row`,
         potentially by calling it internally and applying final formatting rules.
     """
-    raise NotImplementedError("Not implemented yet; follow the docstring guidance.")
-
-
-with st.expander("Assignment TODOs (Edit This Page)"):
-    st.markdown(
-        "- Implement `student_next_size_index`.\n"
-        "- Implement `student_build_trial_log_row`.\n"
-        "- Implement `student_validate_screen_geometry`.\n"
-        "- Implement `student_compute_mar_arcmin`.\n"
-        "- Implement `student_format_trial_log_row`.\n"
-        "- Keep existing table column names."
+    return student_build_trial_log_row(
+        trial_no=trial_no,
+        size_px=size_px,
+        mar_arcmin=mar_arcmin,
+        correct_orientation=correct_orientation,
+        response=response,
     )
 
-st.caption(
-    "How these functions connect: validate screen geometry -> convert size to MAR -> "
-    "log each trial consistently -> update index for next adaptive trial."
-)
+
+# with st.expander("Assignment TODOs (Edit This Page)"):
+#     st.markdown(
+#         "- Keep existing table column names."
+#     )
+
+# st.caption(
+#     "How these functions connect: validate screen geometry -> convert size to MAR -> "
+#     "log each trial consistently -> update index for next adaptive trial."
+# )
 
 try:
     _ = student_next_size_index(current_index=0, is_correct=True, max_index=len(SIZE_LEVELS_PX) - 1)
@@ -301,19 +333,69 @@ with st.container(border=True):
     elif last_feedback == "incorrect":
         st.error("Previous response: Incorrect.")
 
-    response = st.radio("Orientation", ORIENTATIONS, horizontal=True)
-    submitted = st.button(
-        "Submit Response",
-        type="primary",
-        width="stretch",
-    )
-    if submitted:
-        is_correct = response == current_orientation
-        next_index = student_next_size_index(
-            current_index=current_index,
-            is_correct=is_correct,
-            max_index=len(SIZE_LEVELS_PX) - 1,
+    # Initialize listening state
+    if "tumbling_listening" not in st.session_state:
+        st.session_state["tumbling_listening"] = False
+    
+    # Clear keyboard input if flag is set (must happen BEFORE widget is created)
+    if st.session_state.get("tumbling_clear_keyboard", False):
+        st.session_state["tumbling_keyboard_input"] = ""
+        st.session_state["tumbling_clear_keyboard"] = False
+    
+    # Initialize response (will be set if user provides input)
+    response = None
+    
+    if not st.session_state["tumbling_listening"]:
+        if st.button("🎹 Start - Enable Keyboard Input", use_container_width=True, type="primary"):
+            st.session_state["tumbling_listening"] = True
+            st.rerun()
+    else:
+        st.success("⌨️ Keyboard listening ACTIVE - Use WASD (W=Up, A=Left, S=Down, D=Right)")
+        
+        # Use the text input value to trigger responses
+        keyboard_input = st.text_input(
+            "Type WASD to respond:",
+            key="tumbling_keyboard_input",
+            placeholder="Type W/A/S/D here",
         )
+        
+        # If user typed something, process it immediately
+        if keyboard_input:
+            response_map = {
+                'w': 'Up', 'W': 'Up',
+                'a': 'Left', 'A': 'Left',
+                's': 'Down', 'S': 'Down',
+                'd': 'Right', 'D': 'Right',
+            }
+            # Get the last character entered
+            last_char = keyboard_input[-1] if keyboard_input else None
+            if last_char in response_map:
+                response = response_map[last_char]
+                # Set flag to clear on next render
+                st.session_state["tumbling_clear_keyboard"] = True
+        
+        st.caption("Use arrow buttons or type WASD:")
+        
+        # Use columns for button layout
+        col1, col2, col3, col4 = st.columns(4)
+        
+        up_clicked = col1.button("⬆️ Up", use_container_width=True)
+        down_clicked = col2.button("⬇️ Down", use_container_width=True)
+        left_clicked = col3.button("⬅️ Left", use_container_width=True)
+        right_clicked = col4.button("➡️ Right", use_container_width=True)
+        
+        # Check button clicks (takes precedence over keyboard)
+        if up_clicked:
+            response = "Up"
+        elif down_clicked:
+            response = "Down"
+        elif left_clicked:
+            response = "Left"
+        elif right_clicked:
+            response = "Right"
+    
+    if response:
+        is_correct = response == current_orientation
         state["history"].append(
             student_build_trial_log_row(
                 trial_no=len(state["history"]) + 1,
@@ -324,9 +406,16 @@ with st.container(border=True):
             )
         )
 
+        next_index = student_next_size_index(
+            current_index=current_index,
+            is_correct=is_correct,
+            max_index=len(SIZE_LEVELS_PX) - 1,
+        )
+
         state["size_index"] = next_index
         state["trial_orientation"] = next_orientation(current_orientation)
         st.session_state[feedback_key] = "correct" if is_correct else "incorrect"
+        st.session_state["tumbling_clear_keyboard"] = True  # Clear input on next render
         st.rerun()
 
 with st.container(border=True):
